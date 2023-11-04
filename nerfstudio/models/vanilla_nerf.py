@@ -19,7 +19,7 @@ Implementation of vanilla nerf.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple, Type, Literal
+from typing import Any, Dict, List, Literal, Tuple, Type
 
 import torch
 from torch.nn import Parameter
@@ -31,15 +31,14 @@ from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.configs.config_utils import to_immutable_dict
 from nerfstudio.field_components.encodings import NeRFEncoding
 from nerfstudio.field_components.field_heads import FieldHeadNames
-from nerfstudio.field_components.temporal_distortions import TemporalDistortionKind
+from nerfstudio.field_components.temporal_distortions import \
+    TemporalDistortionKind
 from nerfstudio.fields.vanilla_nerf_field import NeRFField
-from nerfstudio.model_components.losses import MSELoss, scale_gradients_by_distance_squared
+from nerfstudio.model_components.losses import (
+    MSELoss, scale_gradients_by_distance_squared)
 from nerfstudio.model_components.ray_samplers import PDFSampler, UniformSampler
-from nerfstudio.model_components.renderers import (
-    AccumulationRenderer,
-    DepthRenderer,
-    RGBRenderer,
-)
+from nerfstudio.model_components.renderers import (AccumulationRenderer,
+                                                   DepthRenderer, RGBRenderer)
 from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.utils import colormaps, misc
 
@@ -154,6 +153,9 @@ class NeRFModel(Model):
                 )
             ray_samples_uniform.frustums.set_offsets(offsets)
 
+
+
+
         # coarse field:
         field_outputs_coarse = self.field_coarse.forward(ray_samples_uniform)
         if self.config.use_gradient_scaling:
@@ -163,7 +165,13 @@ class NeRFModel(Model):
             rgb=field_outputs_coarse[FieldHeadNames.RGB],
             weights=weights_coarse,
         )
-        accumulation_coarse = self.renderer_accumulation(weights_coarse)
+        # Compute distances for each sample along the rays
+        # Assuming that ray_samples_uniform.samples is a tensor containing the depth values for each sample
+        # If ray_samples_uniform.samples are not depths but actual 3D positions, 
+        # you would compute the distances as the norm of (sample_positions - ray_origins)
+
+        distances_coarse = torch.norm(ray_samples_uniform.samples - ray_bundle.origins[:, None, :], dim=-1, keepdim=True)
+        accumulation_coarse = self.renderer_accumulation(weights_coarse,distances=distances_coarse)
         depth_coarse = self.renderer_depth(weights_coarse, ray_samples_uniform)
 
         # pdf sampling
@@ -183,7 +191,12 @@ class NeRFModel(Model):
             rgb=field_outputs_fine[FieldHeadNames.RGB],
             weights=weights_fine,
         )
-        accumulation_fine = self.renderer_accumulation(weights_fine)
+        # Compute distances for the fine samples similarly
+        distances_fine = torch.norm(ray_samples_pdf.samples - ray_bundle.origins[:, None, :], dim=-1, keepdim=True)
+
+        # Pass the weights and distances to the accumulation renderer for the fine samples
+        accumulation_fine = self.renderer_accumulation(weights_fine,distances= distances_fine)
+
         depth_fine = self.renderer_depth(weights_fine, ray_samples_pdf)
 
         outputs = {
