@@ -37,7 +37,8 @@ from torch import Tensor, nn
 
 from nerfstudio.cameras.rays import RaySamples
 from nerfstudio.utils import colors
-from nerfstudio.utils.math import components_from_spherical_harmonics, safe_normalize
+from nerfstudio.utils.math import (components_from_spherical_harmonics,
+                                   safe_normalize)
 
 BackgroundColor = Union[Literal["random", "last_sample", "black", "white"], Float[Tensor, "3"], Float[Tensor, "*bs 3"]]
 BACKGROUND_COLOR_OVERRIDE: Optional[Float[Tensor, "3"]] = None
@@ -296,6 +297,7 @@ class AccumulationRenderer(nn.Module):
         weights: Float[Tensor, "*bs num_samples 1"],
         ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
         num_rays: Optional[int] = None,
+        distances: Optional[Float[Tensor]] = None,
     ) -> Float[Tensor, "*bs 1"]:
         """Composite samples along ray and calculate accumulation.
 
@@ -308,13 +310,37 @@ class AccumulationRenderer(nn.Module):
             Outputs of accumulated values.
         """
 
-        if ray_indices is not None and num_rays is not None:
-            # Necessary for packed samples from volumetric ray sampler
-            accumulation = nerfacc.accumulate_along_rays(
-                weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
-            )
+        if distances is None:
+
+            if ray_indices is not None and num_rays is not None:
+                # Necessary for packed samples from volumetric ray sampler
+                accumulation = nerfacc.accumulate_along_rays(
+                    weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
+                )
+            else:
+                accumulation = torch.sum(weights, dim=-2)
+        
         else:
-            accumulation = torch.sum(weights, dim=-2)
+
+            #put distance attenuation here
+
+            # Apply distance attenuation to weights
+            # Assuming that distances are already squared, if not, you would square them here.
+            # We add a small epsilon to prevent division by zero.
+            epsilon = 1e-7
+            epsilon_tensor = torch.tensor(epsilon, device=distances.device, dtype=distances.dtype)
+
+            attenuated_weights = weights / (distances + epsilon_tensor)
+
+            if ray_indices is not None and num_rays is not None:
+                # If samples are packed, we need to accumulate them according to their ray indices.
+                accumulation = nerfacc.accumulate_along_rays(
+                    attenuated_weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
+                )
+            else:
+                # If samples are not packed, we can directly sum the attenuated weights.
+                accumulation = torch.sum(attenuated_weights, dim=-2)
+
         return accumulation
 
 
