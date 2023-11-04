@@ -197,6 +197,15 @@ class RGBRenderer(nn.Module):
         gt_image = self.blend_background(gt_image, background_color=background_color)
         return pred_image, gt_image
 
+    @staticmethod
+    def apply_gamma_correction(rgb, gamma=2.2):
+        """Applies gamma correction to the rgb values."""
+        gamma_inv = 1.0 / gamma
+        # Ensure that the RGB values are in the range [0, 1]
+        rgb = torch.clamp(rgb, min=0.0, max=1.0)
+        # Apply gamma correction
+        return rgb.pow(gamma_inv)
+
     def forward(
         self,
         rgb: Float[Tensor, "*bs num_samples 3"],
@@ -218,6 +227,7 @@ class RGBRenderer(nn.Module):
             Outputs of rgb values.
         """
 
+        """        
         if background_color is None:
             background_color = self.background_color
 
@@ -228,6 +238,24 @@ class RGBRenderer(nn.Module):
         )
         if not self.training:
             torch.clamp_(rgb, min=0.0, max=1.0)
+        return rgb
+        """
+        if background_color is None:
+            background_color = self.background_color
+
+        if not self.training:
+            rgb = torch.nan_to_num(rgb)
+        
+        rgb = self.combine_rgb(
+            rgb, weights, background_color=background_color, ray_indices=ray_indices, num_rays=num_rays
+        )
+        
+        # Apply gamma correction here
+        rgb = self.apply_gamma_correction(rgb, gamma=2.2)
+        
+        if not self.training:
+            torch.clamp_(rgb, min=0.0, max=1.0)
+        
         return rgb
 
 
