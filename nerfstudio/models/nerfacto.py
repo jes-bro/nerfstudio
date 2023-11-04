@@ -28,23 +28,25 @@ from torchmetrics.functional import structural_similarity_index_measure
 from torchmetrics.image import PeakSignalNoiseRatio
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
-from nerfstudio.cameras.camera_optimizers import CameraOptimizer, CameraOptimizerConfig
+from nerfstudio.cameras.camera_optimizers import (CameraOptimizer,
+                                                  CameraOptimizerConfig)
 from nerfstudio.cameras.rays import RayBundle, RaySamples
-from nerfstudio.engine.callbacks import TrainingCallback, TrainingCallbackAttributes, TrainingCallbackLocation
+from nerfstudio.engine.callbacks import (TrainingCallback,
+                                         TrainingCallbackAttributes,
+                                         TrainingCallbackLocation)
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.field_components.spatial_distortions import SceneContraction
 from nerfstudio.fields.density_fields import HashMLPDensityField
 from nerfstudio.fields.nerfacto_field import NerfactoField
 from nerfstudio.model_components.losses import (
-    MSELoss,
-    distortion_loss,
-    interlevel_loss,
-    orientation_loss,
-    pred_normal_loss,
-    scale_gradients_by_distance_squared,
-)
-from nerfstudio.model_components.ray_samplers import ProposalNetworkSampler, UniformSampler
-from nerfstudio.model_components.renderers import AccumulationRenderer, DepthRenderer, NormalsRenderer, RGBRenderer
+    MSELoss, distortion_loss, interlevel_loss, orientation_loss,
+    pred_normal_loss, scale_gradients_by_distance_squared)
+from nerfstudio.model_components.ray_samplers import (ProposalNetworkSampler,
+                                                      UniformSampler)
+from nerfstudio.model_components.renderers import (AccumulationRenderer,
+                                                   DepthRenderer,
+                                                   NormalsRenderer,
+                                                   RGBRenderer)
 from nerfstudio.model_components.scene_colliders import NearFarCollider
 from nerfstudio.model_components.shaders import NormalsShader
 from nerfstudio.models.base_model import Model, ModelConfig
@@ -303,7 +305,25 @@ class NerfactoModel(Model):
         with torch.no_grad():
             depth = self.renderer_depth(weights=weights, ray_samples=ray_samples)
         expected_depth = self.renderer_expected_depth(weights=weights, ray_samples=ray_samples)
-        accumulation = self.renderer_accumulation(weights=weights)
+
+        # Perform a cumulative sum of deltas to get the distance for each sample along the ray.
+        # deltas should have a shape that is broadcastable to the number of samples.
+        # The cumulative sum will represent the distance from the origin to each sample point along the ray.
+        if ray_samples.deltas is not None:
+            # Calculate cumulative distances along the dimension of samples.
+            # Assuming the second to last dimension indexes the samples.
+            cumulative_deltas = torch.cumsum(ray_samples.deltas, dim=-2)
+
+            # The first delta is the distance from the origin to the first sample,
+            # so we prepend a zero to represent the origin.
+            zero_padding = torch.zeros((*cumulative_deltas.shape[:-2], 1, 1), device=cumulative_deltas.device, dtype=cumulative_deltas.dtype)
+            distances_coarse = torch.cat([zero_padding, cumulative_deltas], dim=-2)
+        else:
+            raise ValueError("deltas must be provided to compute distances")
+
+        #distances_coarse = torch.norm(ray_samples.positions - ray_bundle.origins[:, None, :], dim=-1, keepdim=True)
+        
+        accumulation = self.renderer_accumulation(weights=weights,distances = distances_coarse)
 
         outputs = {
             "rgb": rgb,
