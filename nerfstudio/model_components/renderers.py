@@ -352,7 +352,7 @@ class DepthRenderer(nn.Module):
         method: Depth calculation method.
     """
 
-    def __init__(self, method: Literal["median", "expected"] = "median") -> None:
+    def __init__(self, method: Literal["median", "expected","robust"] = "median") -> None:
         super().__init__()
         self.method = method
 
@@ -405,6 +405,28 @@ class DepthRenderer(nn.Module):
             depth = torch.clip(depth, steps.min(), steps.max())
 
             return depth
+        if self.method == "robust":
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2
+
+            # Define the percentage to trim from each tail of the distribution
+            trim_percent = 0.1  # for example, 10%
+            lower_trim_index = int(weights.shape[-2] * trim_percent)
+            upper_trim_index = int(weights.shape[-2] * (1 - trim_percent))
+
+            # Sort weights and corresponding steps
+            sorted_weights, sorted_indices = torch.sort(weights, dim=-2)
+            sorted_steps = torch.gather(steps, dim=-2, index=sorted_indices)
+
+            # Trim the sorted weights and steps
+            trimmed_weights = sorted_weights[..., lower_trim_index:upper_trim_index, :]
+            trimmed_steps = sorted_steps[..., lower_trim_index:upper_trim_index, :]
+
+            # Calculate the trimmed mean depth
+            trimmed_weight_sum = trimmed_weights.sum(dim=-2, keepdim=True)
+            depth = (trimmed_weights * trimmed_steps).sum(dim=-2) / trimmed_weight_sum
+
+            return depth.clamp(min=steps.min(), max=steps.max())
+
 
         raise NotImplementedError(f"Method {self.method} not implemented")
 
