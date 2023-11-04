@@ -191,8 +191,11 @@ class RGBRenderer(nn.Module):
         if background_color == "last_sample":
             background_color = "black"  # No background blending for GT
         elif background_color == "random":
-            background_color = torch.rand_like(pred_image)
+            #background_color = torch.rand_like(pred_image)
+            background_color = torch.rand(*pred_image.shape).to(dtype=pred_image.dtype, device=pred_image.device)
             pred_image = pred_image + background_color * (1.0 - pred_accumulation)
+            # An example of a Screen blending mode
+            #pred_image = 1 - (1 - pred_image) * (1 - background_color)
         gt_image = self.blend_background(gt_image, background_color=background_color)
         return pred_image, gt_image
 
