@@ -12,11 +12,12 @@ For this project, we first had to learn *a lot* about NeRFs and the underlying M
 
 We knew that given the time constraints of the project and our excessive curricular obligations, we needed an accessible library to help us implement NeRFs. Implementing them from scratch would have been over-scoped- and we wanted to use NeRFs for robotics applications moving forward. Thus, the goal was to learn how to use NeRFs to then generate meshes and Signed Distance Functions that we could use for other localization and more involved computer vision projects.  After researching, we found NeRF Studio, a NeRF API created by researchers at UC Berkeley. They provide scaffolding and infrastructure for the creation, usage, training, and rendering of NeRFs. We installed an iOS app called PolyMap that is usually for photogrammetry, and put that into dev mode so we could download their raw data. Nerf Studio has infrastructure for processing data from Polymap directly, so getting the data for our models ended up being a pretty straight-forward process.
 
-To learn how NeRFs are implemented at a software-level we decided to do follow a similar procedure to that from the homeworks in our independent study in Deep Reinforcement Learning. The assignments in that class essentially leave certain functions or sections of code blank so that students create those algorithms for themselves. We did something similar, where we essentially gave each other "TODOs" that seemed algorithmically interesting within NeRF studio's existing codebase, and had each of us implement those functions ourselves. The functions we decided to focus on were the renderers, because they had intuitive behaviors and directly related to the NeRFs output. We didn't pay as much attention to scaffolding and data manipulation, for example. The three renderers we decided to re-write parts of were:
+To learn how NeRFs are implemented at a software-level we decided to do follow a similar procedure to that from the homeworks in our independent study in Deep Reinforcement Learning. The assignments in that class essentially leave certain functions or sections of code blank so that students create those algorithms for themselves. We did something similar, where we essentially gave each other "TODOs" that seemed algorithmically interesting within NeRF studio's existing codebase, and had each of us implement those functions ourselves. The functions we decided to focus on were the renderers, because they had intuitive behaviors and directly related to the NeRFs output. We didn't pay as much attention to scaffolding and data manipulation, for example. The four renderers we decided to re-write parts of were:
 
 1. The Accumulation Renderer
 2. The Depth Renderer
 3. The RGB Renderer
+4. The Normals Renderer
 
 ## Conceptual Explanation of Neural Radiance Fields (NeRF)
 
@@ -85,7 +86,7 @@ $\sigma(\mathbf{x}) : \mathbb{R}^3 \rightarrow \mathbb{R}
 $ \
 Where $\sigma$ maps from a point in 3D euclidean space to a real number, representing density. 
 
-In computer graphics, and specifically in the context of Neural Radiance Fields (NeRF), the "density of a medium at a point in space" refers to a conceptual representation of how much matter or light-interactive material is present at a specific point in a scene being modeled. This is not about physical density as measured in real-world units like kilograms per cubic meter, but rather a value that indicates how much light is blocked or scattered at that point, which is essential for simulating light transport in a scene.
+In computer graphics, and specifically in the context of Neural Radiance Fields (NeRF), the "density of a medium at a point in space" refers to a conceptual representation of how much matter or light-interactive material is present at a specific point in a scene being modeled. This is not about physical density as measured in real-world units like kilograms per cubic meter, but rather a value that indicates how much light is blocked or scattered at that point, which is essential for simulating light transport in a scene. When a ray of light hits a place with a high volume density, it suggests that part is likely to be part of an object. If the volume density is low, it means there's probably not much there. 
 
 ### Continuous Volumetric Functions
 
@@ -224,20 +225,7 @@ Further modifications were made to how the renderers determine density, color, a
 
 ### Accumulation Renderer
 
-The accumulation renderer is responsible for calculating the accumulation of values along a ray.
-
-    Inputs: It takes weights, which represent the transmittance or opacity of sampled points along a ray. These weights are typically a function of the density at each point predicted by the NeRF model. Optionally, it can also receive ray_indices and num_rays when dealing with packed rays, as well as distances which could represent the distance from the camera for each sampled point.
-
-    Simple Accumulation (without distances): If no distances are provided, the method simply sums up the weights along each ray. If the ray_indices and num_rays are provided (when rays are packed for efficiency), it uses a specialized function nerfacc.accumulate_along_rays to accumulate weights according to their ray indices.
-
-    Distance Attenuation: If distances are provided, it first computes an attenuation factor based on those distances. In the provided code, it seems like there should be an operation that applies distance-based attenuation to the weights (though the code for the actual operation is commented out and says "put distance attenuation here"). The purpose of this is to adjust the weights based on the distance of each point from the camera, simulating the effect of light falloff over distance.
-        Epsilon: To avoid division by zero when computing attenuation, a small epsilon value is added to the distances.
-
-    Attenuated Accumulation: If ray_indices and num_rays are provided, it again uses the specialized accumulate_along_rays function to accumulate the attenuated weights according to their ray indices. If not, it sums the attenuated weights directly.
-
-    Return: The method returns the accumulated values, which represents the total transmittance along the ray from the point of view of the camera to the background. This accumulation is critical for determining how much of the background light reaches the camera through the volume, influencing the final color of each pixel in the rendered image.
-
-The AccumulationRenderer is all about computing how much light is blocked or allowed to pass through the scene along each ray, with or without considering the effect of the distance from each sampled point to the camera. This is essential for correctly rendering semi-transparent volumes like fog, clouds, or any material that is not completely opaque.
+The accumulation renderer is responsible for calculating the accumulation of values along a ray. It takes weights, which represent the transmittance or opacity of sampled points along a ray. These weights are a function of the density at each point predicted by the NeRF model. Optionally, it can also receive ray_indices and num_rays when dealing with packed rays, as well as distances which could represent the distance from the camera for each sampled point. If no distances are provided, the method simply sums up the weights along each ray. If the ray_indices and num_rays are provided (when rays are packed for efficiency), it uses a specialized function nerfacc.accumulate_along_rays to accumulate weights according to their ray indices. If distances are provided, it first computes an attenuation factor based on those distances. The purpose of this is to adjust the weights based on the distance of each point from the camera, simulating the effect of light falloff over distance. To avoid division by zero when computing attenuation, a small epsilon value is added to the distances. If ray_indices and num_rays are provided, it again uses the specialized accumulate_along_rays function to accumulate the attenuated weights according to their ray indices. If not, it sums the attenuated weights directly.
 
 The AccumulationRenderer now includes a light intensity correction according to the inverse square law, for more realistic color blending.
 
@@ -306,6 +294,12 @@ class AccumulationRenderer(nn.Module):
 
 ![Inverse Square Law Light Intensity](images/inv_sqr.png)
 
+### Depth Renderer
+
+The depth renderer is designed to compute the depth information from a set of ray samples and their associated weights. Each ray sample represents a point in space where the NeRF model evaluates the scene's density and color. The weights typically represent the probability of a ray terminating at each sample point, which is based on the density of the points along the ray.
+
+The class supports different methods for calculating the depth, each suitable for different scenarios and providing various robustness to noise and outliers in the depth estimation. Median computes the median depth of all samples along a ray. The median is less sensitive to outliers than the mean, which makes it a robust choice for depth estimation. The median depth is computed by finding the sample at which the cumulative distribution of the weights reaches 50%. Expected computes the expected depth as a weighted average of the sample depths, where the weights are normalized to sum to one. This method assumes that the weights represent the probability of the ray terminating at each point and computes an average based on these probabilities. Robust aims to compute a depth value that is robust to outliers by trimming a certain percentage of the highest and lowest weighted samples before computing the weighted average depth. This can help mitigate the influence of noise and other artifacts in the depth estimation. Robust_weighted_median uses a robust weighting mechanism to compute a weighted median depth. It first flattens the weights and steps (sample depths), computes the median depth, and the Median Absolute Deviation (MAD) from the median depth. It then applies a weighting function to reduce the influence of samples that are far from the median (potentially outliers). Then it computes the median of the robustly weighted set of samples.
+
 Depth renderer changes include a weighted median for depth values and robust filtering to handle outliers in the dataset. Outliers are images whose RGB values do not match well with their pose, but dataset pruning helps mitigate this issue.
 
 ```python
@@ -373,8 +367,11 @@ class DepthRenderer(nn.Module):
             median_idx = torch.searchsorted(cumulative_weights, total_weight / 2)  # Index of weighted median.
            
 ```
+### RGB Renderer 
 
-We also added gamma correction to our RGB renderer. This adjustment isn't theoretically necessary but does improve details in shadows and display quality.
+The RGBRenderer takes the intermediate output of the NeRF model (colors and densities along sampled points on rays) and produces the final images that are the rendered views of the scene. It performs the actual volumetric compositing of the colors along each ray based on the weights. This step blends all the sampled colors along a ray to create a single color value that represents the pixel corresponding to that ray.
+
+We added gamma correction to our RGB renderer. This adjustment isn't theoretically necessary but does improve details in shadows and display quality.
 ```python
 
     @staticmethod
@@ -386,11 +383,63 @@ We also added gamma correction to our RGB renderer. This adjustment isn't theore
         # Apply gamma correction
         return rgb.pow(gamma_inv)
 ```
+
 ![Gamma Correction](images/gamma-correction-1.png)
 
-### Jessica's Normalization Explanation
+### Normals Renderer 
 
-TODO: Jessica's explanation about normalization.
+The normals renderer calculates surface normals. Surface normals are vectors perpendicular to the surface of an object at a given point, and they determine how light interacts with that surface, affecting the appearance of the object in terms of shading and texture. The output is a tensor of blended normals for the rays. These normals are essential for shading the scene because they determine how light reflects off objects' surfaces, giving a sense of photo-realism the rendered image.
+
+The original Normals Renderer directly summed the weighted normals. It calculated the weighted average of the normals along the ray, where the weights are determined by the opacity or density of the samples from the original NeRF rendering. Now, we calculate weights based on the angles between pairs of normals for all samples. It re-weights the normals by considering the angle between each pair of normals across the samples. This method emphasizes normals that are more aligned with each other, potentially leading to a smoother representation of surfaces.
+
+```python
+class NormalsRenderer(nn.Module):
+    """Calculate normals along the ray."""
+    
+    def forward(self, normals: torch.Tensor, weights: torch.Tensor, normalize: bool = True) -> torch.Tensor:
+        """Calculate normals along the ray.
+        Args:
+            normals: Normals for each sample [batch_size, num_samples, 3].
+            weights: Weights of each sample [batch_size, num_samples, 1].
+            normalize: Normalize normals.
+        """
+        # Get the batch size and the number of samples from the normals tensor.
+        batch_size, num_samples, _ = normals.size()
+        # Initialize a new tensor for the new weights, same shape as original weights.
+        new_weights = torch.zeros_like(weights)
+
+        # Compute new weights based on angles between all pairs of normals.
+        for i in range(num_samples):  # Loop over each sample.
+            for j in range(i + 1, num_samples):  # Compare with every other sample.
+                # Calculate the weight based on the angle between pair of normals.
+                angle_weight = angle_based_weighting(normals[:, i, :], normals[:, j, :])
+                # Add this weight to both normals being compared.
+                new_weights[:, i, :] += angle_weight
+                new_weights[:, j, :] += angle_weight
+
+        # Normalize the new weights to ensure they remain in a reasonable range.
+        new_weights = new_weights / torch.max(new_weights)
+
+        # Calculate the weighted sum of normals using the new weights.
+        n = torch.sum(new_weights * normals, dim=1)
+
+        # If normalization is requested, normalize the result.
+        if normalize:
+            n = safe_normalize(n)
+        # Return the blended normals.
+        return n
+
+def angle_based_weighting(normal_a, normal_b):
+    # Calculate the dot product between two normals, which is the cosine of the angle between them.
+    cosine_angle = torch.clamp(torch.dot(normal_a, normal_b), -1.0, 1.0)
+    # Use arccos to calculate the actual angle from the cosine value.
+    angle = torch.acos(cosine_angle)
+    # Assign a weight based on the angle, giving higher weights to smaller angles (more aligned normals).
+    weight = torch.exp(-angle)
+    # Return the calculated weight.
+    return weight
+
+```
 
 ## Trained and Altered NeRF Representations
 
