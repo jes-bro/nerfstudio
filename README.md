@@ -1,11 +1,8 @@
 # Computational Robotics: NeRF or Nothing
 
-<p align="center">
 ![](https://github.com/jes-bro/nerfstudio/blob/main/ezgif.com-video-to-gif.gif)
-   </p>
-   <p align="center">
 ![](https://github.com/jes-bro/nerfstudio/blob/main/ezgif.com-gif-maker.gif)
-</p>
+
 
 ## Goal
 
