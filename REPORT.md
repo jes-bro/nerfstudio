@@ -7,7 +7,7 @@ The goal of this assignment was to learn about Neural Radiance Fields. The learn
 1. Research NeRFs and understand how they work (understanding them from a theoretical perspective).
 2. Recreate some of the NeRF functionality for ourselves (understanding the implementation). 
 
-## Approach / Methadology
+## Approach / Methodology
 For this project, we first had to learn *a lot* about NeRFs and the underlying ML and computer vision theory that allows them to work.
 
 We knew that given the time constraints of the project and our excessive curricular obligations, we needed an accessible library to help us implement NeRFs. Implementing them from scratch would have been over-scoped- and we wanted to use NeRFs for robotics applications moving forward. Thus, the goal was to learn how to use NeRFs to then generate meshes and Signed Distance Functions that we could use for other localization and more involved computer vision projects.  After researching, we found NeRF Studio, a NeRF API created by researchers at UC Berkeley. They provide scaffolding and infrastructure for the creation, usage, training, and rendering of NeRFs. We installed an iOS app called PolyMap that is usually for photogrammetry, and put that into dev mode so we could download their raw data. Nerf Studio has infrastructure for processing data from Polymap directly, so getting the data for our models ended up being a pretty straight-forward process.
