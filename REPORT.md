@@ -1,4 +1,4 @@
-# Computational Robotics Computer Vision Project: NeRF or Nothing
+# Computational Robotics: NeRF or Nothing
 
 ## Goal
 
