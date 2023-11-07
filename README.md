@@ -1,7 +1,12 @@
 # Computational Robotics: NeRF or Nothing
 
+<p align="center">
 ![](https://github.com/jes-bro/nerfstudio/blob/main/ezgif.com-video-to-gif.gif)
+   </p>
+   <p align="center">
 ![](https://github.com/jes-bro/nerfstudio/blob/main/ezgif.com-gif-maker.gif)
+</p>
+
 ## Goal
 
 The goal of this assignment was to learn about Neural Radiance Fields. The learning process was two-fold:
