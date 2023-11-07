@@ -97,24 +97,36 @@ and the output is an emitted color (RGB) and volume density $\alpha$.
 
 In other words, they map a 5-D coordinate (pose and orientation in space) to a volume density and RGB color.
 
-## How does optimizing the volumetric scene function work?
+## Optimizing Continuous Volumetric Functions
 
-By accumulating (integrating) the density across different viewpoints and locations, novel views of the scene can be created.
+By accumulating (integrating) the density across different viewpoints and locations, novel views of the scene can be created:
 
-To train a NeRF, you only need a set of images and their respective camera poses. Scenes are modeled implicitly through the weights of the feed-forward neural net. As an FYI, NeRFs, neural graphic primitives, and neural fields basically mean the same thing, in case you encounter the other terms. 
+$C(\mathbf{r}) = \int_{t_n}^{t_f} T(t) \sigma(\mathbf{r}(t)) \mathbf{c}(\mathbf{r}(t), \mathbf{d}) \, dt$
 
-## What is a neural field?
+where:
 
-The idea of neural fields predates neural radiance fields. A neural field is a neural network that parameterizes a signal. It's common that the signal is a 3D scene or object, but that doesn't have to be the case.They are commonly used in computer graphics and image synthesis. In most neural field implementations, connected neural networks encode objects and scene properties. Only one network needs to be trained to encode/capture a scene. Unlike regular machine learning algorithms, the goal is to overfit your network rather than generalize it to different scenes. In other words, a single neural field encodes a single scene. They encode the scene in the weights of the network. 
+- $C(\mathbf{r})$ is the color accumulated along ray $\mathbf{r}.$ 
+- $\int$ denotes integration}. 
+- $t_n$ and $t_f$ are the bounds of integration, representing the near and far bounds along the ray. 
+- $T(t)$ is the accumulated transmittance along the ray until point t, which represents how much light is not absorbed. 
+- $\sigma(\mathbf{r}(t))$ is the density at point t along ray $\mathbf{r}.$ 
+- $\mathbf{c}(\mathbf{r}(t), \mathbf{d})$ is the color at poin t along ray $\mathbf{r}$, with direction $\mathbf{d}.$ 
+- $dt$ is the differential segment of the ray.
+
+
+## Neural Fields
+
+Neural fields, also known as neural implicit functions, provide a framework for modeling continuous volumetric functions using neural networks. The relationship between neural fields and continuous volumetric functions is primarily based on how neural fields can represent complex and high-fidelity 3D geometries in a continuous manner. 
+
+More generally, a neural field is a neural network that parameterizes a signal. It's common that the signal is a 3D scene or object, but that doesn't have to be the case. They are commonly used in computer graphics and image synthesis. In most neural field implementations, connected neural networks encode objects and scene properties. Only one network needs to be trained to encode/capture a scene. Unlike regular machine learning algorithms, the goal is to overfit your network rather than generalize it to different scenes. In other words, a single neural field encodes a single scene. They encode the scene in the weights of the network. 
+
+Neural fields use neural networks to parameterize a continuous function that maps coordinates in space to some output values, such as color and density. These outputs can be sampled at any continuous point in space, allowing for the creation of a continuous volumetric scene or object representation.
 
 ## Why neural fields over alternative representations?
 
-3D scenes can also be stored in voxel grids or polygon meshes. Voxel grids are 3D occupancy grids. Therefore, they are computationally expensive, because you need to store occupancy data for every voxel. Meanwhile, polygon meshes can only represent hard surfaces and can be low-fidelity.
-Neural fields are efficient and compact 3D representations of objects or scenes because they are differentiable and continuous.
+Unlike traditional volumetric representations that store explicit values in a grid (like voxels- which are basically 3D occupancy grids), neural fields use the weights of a neural network to implicitly encode the volume. This allows for a memory-efficient representation, as the neural network can represent a continuous volume without discretizing it into grid cells or pixels. 
 
-## What is a field?
-
-A field is a quantity defined for all spatial coordinates. It is a mapping from coordinate x to coordinate y, and is represented by a scalar, vector, or tensor. Examples include gravitational fields.
+Since neural fields use a neural network, they are differentiable with respect to both the input coordinates and the network parameters. This allows for the use of gradient-based optimization techniques to adjust the parameters of the network such that it can reproduce the characteristics of a given volumetric function based on observed data (ie. a set of 2D images).
 
 ## To train a neural field:
 
@@ -131,11 +143,11 @@ A sensor observation is also a neural field denoted as $g(\mathbf{x})$.
 
 The forward map is a mapping between the two neural fields and is differentiable, denoted as $h(f(\mathbf{x}) = g(\mathbf{x}))$.
 
-Thanks to these definitions, we can solve an optimization problem to calculate the neural field, which is the process of training a NeRF.
+Thanks to these definitions, we can solve an optimization problem to calculate the neural field/ optimized continuous volumetric function, which is the process of training a NeRF.
 
 ## NeRF Theory
 
-NeRFs use a deep neural network architecture to create 3D renders of scenes. They can operate on sparse data sets of images and poses. They use these images and their poses in 3D space to optimize a continuous volumetric scene function. The function can produce novel views of a complex scene. NeRFs are known for being able to produce high fidelity renders, especially in comparison to pre-NeRF methods like DeepSDF (deep Signed Distance Functions) and SRNs (Scene Representation Networks).
+NeRFs use a deep neural network architecture to create 3D renders of scenes. They can operate on sparse data sets of images and poses. They use these images and their poses in 3D space to optimize a continuous volumetric scene function. The function can produce novel views of a complex scene. NeRFs are known for being able to produce high fidelity renders, especially in comparison to pre-NeRF methods like DeepSDF (deep Signed Distance Functions) and SRNs (Scene Representation Networks). To train a NeRF, you only need a set of images and their respective camera poses. Scenes are modeled implicitly through the weights of the feed-forward neural net.
 
 ### View Frustum in Camera Perspective
    A view frustum is the visible space (conic region) in the 3D world that gets projected onto the camera plane. Mathematically, it can be defined by the camera's intrinsic parameters and the near $z_{near}$ and far $z_{far}$ planes:
@@ -172,7 +184,7 @@ NeRFs use a deep neural network architecture to create 3D renders of scenes. The
 
    where $\mathcal{R}$ is the set of all rays cast from all pixels of all training images.
 
-## Representing NeRFs as a Neural Network
+## Representing NeRFs as a Neural Network - Putting it all together
 
 The input and output relationship of the NeRF model can be represented as:
 $\text{Output: } (\mathbf{c}, \sigma) = \text{MLP}(\mathbf{x}; \mathbf{\Theta})
