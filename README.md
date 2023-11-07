@@ -447,6 +447,14 @@ def angle_based_weighting(normal_a, normal_b):
 
 ```
 
+Describe a design decision you had to make when working on your project and what you ultimately did (and why)? These design decisions could be particular choices for how you implemented some part of an algorithm or perhaps a decision regarding which of two external packages to use in your project.
+
+One of our design decisions involved editing our renderer to account for intensity fall off of light as it passes through a medium. 
+
+What if any challenges did you face along the way?
+What would you do to improve your project if you had more time?
+Did you learn any interesting lessons for future robotic programming projects? These could relate to working on robotics projects in teams, working on more open-ended (and longer term) problems, or any other relevant topic.
+
 ## Trained and Altered NeRF Representations
 
 ![NeRF Representation 1](images/bulldozer.png)
