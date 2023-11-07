@@ -1,9 +1,22 @@
-# Computational Robotics Computer Vision Project: NeRF-Nothing
+# Computational Robotics Computer Vision Project: NeRF or Nothing
 
-## Team Members
+## Goal
 
-- Jessica Brown
-- Luke Witten
+The goal of this assignment was to learn about Neural Radiance Fields. The learning process was two-fold:
+
+1. Research NeRFs and understand how they work (understanding them from a theoretical perspective).
+2. Recreate some of the NeRF functionality for ourselves (understanding the implementation). 
+
+## Approach / Methadology
+For this project, we first had to learn *a lot* about NeRFs and the underlying ML and computer vision theory that allows them to work.
+
+We knew that given the time constraints of the project and our excessive curricular obligations, we needed an accessible library to help us implement NeRFs. Implementing them from scratch would have been over-scoped- and we wanted to use NeRFs for robotics applications moving forward. Thus, the goal was to learn how to use NeRFs to then generate meshes and Signed Distance Functions that we could use for other localization and more involved computer vision projects.  After researching, we found NeRF Studio, a NeRF API created by researchers at UC Berkeley. They provide scaffolding and infrastructure for the creation, usage, training, and rendering of NeRFs. We installed an iOS app called PolyMap that is usually for photogrammetry, and put that into dev mode so we could download their raw data. Nerf Studio has infrastructure for processing data from Polymap directly, so getting the data for our models ended up being a pretty straight-forward process.
+
+To learn how NeRFs are implemented at a software-level we decided to do what we have been doing for our independent study in Deep Reinforcement Learning. The assignments in that class essentially leave certain functions or sections of code blank so that students create those algorithms for themselves. We did something similar, where we essentially gave each other "TODOs" that seemed algorithmically interesting within NeRF studio's existing codebase, and had each of us implement those functions ourselves. The functions we decided to focus on were the renderers, because they had intuitive behaviors and directly related to the NeRFs output. We didn't pay as much attention to scaffolding and data manipulation, for example. The three renderers we decided to re-write parts of were:
+
+1. The Accumulation Renderer
+2. The Depth Renderer
+3. The RGB Renderer
 
 ## Explanation of Neural Radiance Fields (NeRF)
 
