@@ -220,7 +220,26 @@ We used NerfStudio to create NeRFs using image and orientation data collected fr
 
 ![NeRF Sample Image](images/bulldozer.png)
 
-Further modifications were made to how the renderers determine density, color, and depth values. The AccumulationRenderer now includes a light intensity correction according to the inverse square law, for more realistic color blending.
+Further modifications were made to how the renderers determine density, color, and depth values. 
+
+### Accumulation Renderer
+
+The accumulation renderer is responsible for calculating the accumulation of values along a ray.
+
+    Inputs: It takes weights, which represent the transmittance or opacity of sampled points along a ray. These weights are typically a function of the density at each point predicted by the NeRF model. Optionally, it can also receive ray_indices and num_rays when dealing with packed rays, as well as distances which could represent the distance from the camera for each sampled point.
+
+    Simple Accumulation (without distances): If no distances are provided, the method simply sums up the weights along each ray. If the ray_indices and num_rays are provided (when rays are packed for efficiency), it uses a specialized function nerfacc.accumulate_along_rays to accumulate weights according to their ray indices.
+
+    Distance Attenuation: If distances are provided, it first computes an attenuation factor based on those distances. In the provided code, it seems like there should be an operation that applies distance-based attenuation to the weights (though the code for the actual operation is commented out and says "put distance attenuation here"). The purpose of this is to adjust the weights based on the distance of each point from the camera, simulating the effect of light falloff over distance.
+        Epsilon: To avoid division by zero when computing attenuation, a small epsilon value is added to the distances.
+
+    Attenuated Accumulation: If ray_indices and num_rays are provided, it again uses the specialized accumulate_along_rays function to accumulate the attenuated weights according to their ray indices. If not, it sums the attenuated weights directly.
+
+    Return: The method returns the accumulated values, which represents the total transmittance along the ray from the point of view of the camera to the background. This accumulation is critical for determining how much of the background light reaches the camera through the volume, influencing the final color of each pixel in the rendered image.
+
+The AccumulationRenderer is all about computing how much light is blocked or allowed to pass through the scene along each ray, with or without considering the effect of the distance from each sampled point to the camera. This is essential for correctly rendering semi-transparent volumes like fog, clouds, or any material that is not completely opaque.
+
+The AccumulationRenderer now includes a light intensity correction according to the inverse square law, for more realistic color blending.
 
 ```python
 
@@ -356,7 +375,17 @@ class DepthRenderer(nn.Module):
 ```
 
 We also added gamma correction to our RGB renderer. This adjustment isn't theoretically necessary but does improve details in shadows and display quality.
+```python
 
+    @staticmethod
+    def apply_gamma_correction(rgb, gamma=2.2):
+        """Applies gamma correction to the rgb values."""
+        gamma_inv = 1.0 / gamma
+        # Ensure that the RGB values are in the range [0, 1]
+        rgb = torch.clamp(rgb, min=0.0, max=1.0)
+        # Apply gamma correction
+        return rgb.pow(gamma_inv)
+```
 ![Gamma Correction](images/gamma-correction-1.png)
 
 ### Jessica's Normalization Explanation
