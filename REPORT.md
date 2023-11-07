@@ -18,7 +18,7 @@ To learn how NeRFs are implemented at a software-level we decided to do follow a
 2. The Depth Renderer
 3. The RGB Renderer
 
-## Explanation of Neural Radiance Fields (NeRF)
+## Conceptual Explanation of Neural Radiance Fields (NeRF)
 
 A Neural Radiance Field (NeRF) is a neural network-based method of creating new, photorealistic depictions of 3D scenes. To train a NeRF, one inputs a collection of images, along with their pose and orientation, into a neural network. This network interprets them in 3D space by casting rays through the images, training a continuous 3D function that contains color values matching those projected from the training images.
 
@@ -69,10 +69,76 @@ In the actual NeRF model, we do both. We take a course sample of our NeRF using 
 
 After sampling, we have successfully created a new representation of our scene using a NeRF!
 
-## Theory
+## Computer Graphics Theory: How NeRFs Came to Be (a precursor to NeRF theory)
+
+To understand NeRFs, one must understand the theoretical foundation upon which NeRFs were created. That theory includes:
+
+### Scenes 
+
+Scenes are the subject of image synthesis. They are defined by geometry, appearance, lighting, and viewpoints. 
+
+### Volume Density
+
+The volume density is a function that gives the density of a medium in any given point in space. 
+
+$\sigma(\mathbf{x}) : \mathbb{R}^3 \rightarrow \mathbb{R}
+$ \
+Where $\sigma$ maps from a point in 3D euclidean space to a real number, representing density. 
+
+In computer graphics, and specifically in the context of Neural Radiance Fields (NeRF), the "density of a medium at a point in space" refers to a conceptual representation of how much matter or light-interactive material is present at a specific point in a scene being modeled. This is not about physical density as measured in real-world units like kilograms per cubic meter, but rather a value that indicates how much light is blocked or scattered at that point, which is essential for simulating light transport in a scene.
+
+### Continuous Volumetric Functions
+
+A continuous volumetric scene function is a continuous representation of scenes and objects. A scene is represented as a 5D vector-valued function with an input that is a 3D location $(x, y, z)$ and a 2D viewing direction $(\theta, \phi)$:
+
+$f : (\mathbb{R}^3, S^2) \rightarrow (\mathbb{R}^3, \mathbb{R}) $
+
+and the output is an emitted color (RGB) and volume density $\alpha$.
+
+In other words, they map a 5-D coordinate (pose and orientation in space) to a volume density and RGB color.
+
+## How does optimizing the volumetric scene function work?
+
+By accumulating (integrating) the density across different viewpoints and locations, novel views of the scene can be created.
+
+To train a NeRF, you only need a set of images and their respective camera poses. Scenes are modeled implicitly through the weights of the feed-forward neural net. As an FYI, NeRFs, neural graphic primitives, and neural fields basically mean the same thing, in case you encounter the other terms. 
+
+## What is a neural field?
+
+The idea of neural fields predates neural radiance fields. A neural field is a neural network that parameterizes a signal. It's common that the signal is a 3D scene or object, but that doesn't have to be the case.They are commonly used in computer graphics and image synthesis. In most neural field implementations, connected neural networks encode objects and scene properties. Only one network needs to be trained to encode/capture a scene. Unlike regular machine learning algorithms, the goal is to overfit your network rather than generalize it to different scenes. In other words, a single neural field encodes a single scene. They encode the scene in the weights of the network. 
+
+## Why neural fields over alternative representations?
+
+3D scenes can also be stored in voxel grids or polygon meshes. Voxel grids are 3D occupancy grids. Therefore, they are computationally expensive, because you need to store occupancy data for every voxel. Meanwhile, polygon meshes can only represent hard surfaces and can be low-fidelity.
+Neural fields are efficient and compact 3D representations of objects or scenes because they are differentiable and continuous.
+
+## What is a field?
+
+A field is a quantity defined for all spatial coordinates. It is a mapping from coordinate x to coordinate y, and is represented by a scalar, vector, or tensor. Examples include gravitational fields.
+
+## To train a neural field:
+
+- Sample coordinates from a scene
+- Feed them to a neural network to produce field quantities
+- Sample the field quantities from the desired reconstruction domain of the problem
+- Map the reconstruction back to the sensor domain (like the RGB image that you actually see on your laptop screen of the NeRF)
+- Calculate the reconstruction error and optimize the neural network.
+
+Mathematical Definitions:
+The reconstruction is a neural field denoted as $f(\mathbf{x})$.
+
+A sensor observation is also a neural field denoted as $g(\mathbf{x})$.
+
+The forward map is a mapping between the two neural fields and is differentiable, denoted as $h(f(\mathbf{x}) = g(\mathbf{x}))$.
+
+Thanks to these definitions, we can solve an optimization problem to calculate the neural field, which is the process of training a NeRF.
+
+## NeRF Theory
+
+NeRFs use a deep neural network architecture to create 3D renders of scenes. They can operate on sparse data sets of images and poses. They use these images and their poses in 3D space to optimize a continuous volumetric scene function. The function can produce novel views of a complex scene. NeRFs are known for being able to produce high fidelity renders, especially in comparison to pre-NeRF methods like DeepSDF (deep Signed Distance Functions) and SRNs (Scene Representation Networks).
 
 ### View Frustum in Camera Perspective
-   A view frustum is the visible space in the 3D world that gets projected onto the camera plane. Mathematically, it can be defined by the camera's intrinsic parameters and the near $z_{near}$ and far $z_{far}$ planes:
+   A view frustum is the visible space (conic region) in the 3D world that gets projected onto the camera plane. Mathematically, it can be defined by the camera's intrinsic parameters and the near $z_{near}$ and far $z_{far}$ planes:
 
    $\text{Frustum} = \{ (x, y, z) \mid x, y \in \text{Image plane}, z_{near} \leq z \leq z_{far} \}
    $
@@ -83,7 +149,7 @@ After sampling, we have successfully created a new representation of our scene u
    $\mathbf{r}(t) = \mathbf{o} + t\mathbf{d}, \quad t \in [t_n, t_f]
    $
 
-   where $mathbf{o}$ is the ray origin, $mathbf{d}$ is the normalized direction vector, and $t_n$ and $t_f$ are the intersections of the ray with the near and far planes of the frustum.
+   where $\mathbf{o}$ is the ray origin, $\mathbf{d}$ is the normalized direction vector, and $t_n$ and $t_f$ are the intersections of the ray with the near and far planes of the frustum.
 
 ### Volume Integration along Rays
    The volume rendering integral accumulates color $\mathbf{c}$ and density $\sigma$ along the ray within the frustum:
@@ -136,7 +202,6 @@ As the optimization progresses, the NeRF model learns to represent the scene acc
 
 This mathematical framework allows us to render a scene from new viewpoints by calculating what the camera would see from those positions, even if those views were not part of the original dataset, as long as they lie within the volume the NeRF has learned to represent.
 
-
 ## Code Implementation
 
 We used NerfStudio to create NeRFs using image and orientation data collected from the PolyCam app.
@@ -145,9 +210,138 @@ We used NerfStudio to create NeRFs using image and orientation data collected fr
 
 Further modifications were made to how the renderers determine density, color, and depth values. The AccumulationRenderer now includes a light intensity correction according to the inverse square law, for more realistic color blending.
 
+```python
+
+class AccumulationRenderer(nn.Module):
+    """Accumulated value along a ray."""
+
+    @classmethod
+    def forward(
+        cls,
+        weights: Float[Tensor, "*bs num_samples 1"],
+        ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
+        num_rays: Optional[int] = None,
+        distances: Optional[Float[Tensor]] = None,
+    ) -> Float[Tensor, "*bs 1"]:
+        """Composite samples along ray and calculate accumulation.
+
+        Args:
+            weights: Weights for each sample
+            ray_indices: Ray index for each sample, used when samples are packed.
+            num_rays: Number of rays, used when samples are packed.
+            distances: Optional distance weights for attenuation.
+
+        Returns:
+            Outputs of accumulated values.
+        """
+
+        # Check if distances are not provided
+        if distances is None:
+            # Check if ray_indices and num_rays are provided for packed samples
+            if ray_indices is not None and num_rays is not None:
+                # Necessary for packed samples from volumetric ray sampler
+                accumulation = nerfacc.accumulate_along_rays(
+                    weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
+                )
+            else:
+                # If not packed, sum the weights across the samples dimension
+                accumulation = torch.sum(weights, dim=-2)
+        
+        else:
+            # Distance attenuation should be applied here if distances are provided
+
+            # Apply distance attenuation to weights
+            # Assuming that distances are already squared; square them if they are not.
+            # Adding a small epsilon to prevent division by zero errors.
+            epsilon = 1e-7
+            epsilon_tensor = torch.tensor(epsilon, device=distances.device, dtype=distances.dtype)
+
+            # Compute attenuated weights by dividing by distances (with epsilon added for numerical stability)
+            attenuated_weights = weights / (distances + epsilon_tensor)
+
+            # If samples are packed, accumulate them according to their ray indices
+            if ray_indices is not None and num_rays is not None:
+                accumulation = nerfacc.accumulate_along_rays(
+                    attenuated_weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
+                )
+            else:
+                # If samples are not packed, directly sum the attenuated weights
+                accumulation = torch.sum(attenuated_weights, dim=-2)
+
+        # Return the accumulated value along the ray
+        return accumulation
+
+```
+
 ![Inverse Square Law Light Intensity](images/inv_sqr.png)
 
 Depth renderer changes include a weighted median for depth values and robust filtering to handle outliers in the dataset. Outliers are images whose RGB values do not match well with their pose, but dataset pruning helps mitigate this issue.
+
+```python
+class DepthRenderer(nn.Module):
+    """Renderer for calculating depth from ray data using various methods."""
+
+    def __init__(self, method: Literal["median", "expected", "robust", "robust_weighted_median"] = "median") -> None:
+        super().__init__()
+        self.method = method  # Depth calculation method to be used.
+
+    def forward(
+        self,
+        weights: Float[Tensor, "*batch num_samples 1"],
+        ray_samples: RaySamples,
+        ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
+        num_rays: Optional[int] = None,
+    ) -> Float[Tensor, "*batch 1"]:
+        """Composite weighted samples to calculate depth."""
+
+        if self.method == "median":
+            # Calculate median depth values from samples.
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2  # Midpoints of sample intervals.
+            cumulative_weights = torch.cumsum(weights[..., 0], dim=-1)  # Cumulative weights across samples.
+            split = torch.ones((*weights.shape[:-2], 1), device=weights.device) * 0.5  # 50% weight threshold.
+            median_index = torch.searchsorted(cumulative_weights, split, side="left")  # Index where weight is 50%.
+            median_index = torch.clamp(median_index, 0, steps.shape[-2] - 1)  # Clamp index within valid range.
+            median_depth = torch.gather(steps[..., 0], dim=-1, index=median_index)  # Get median depth values.
+            return median_depth
+
+        if self.method == "expected":
+            # Calculate expected depth values from samples.
+            eps = 1e-10  # Small epsilon to avoid division by zero.
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2  # Midpoints of sample intervals.
+            depth = (torch.sum(weights * steps, dim=-2) / (torch.sum(weights, -2) + eps)).clamp(min=steps.min(), max=steps.max())
+            # Clamped weighted sum of steps to get expected depth.
+            return depth
+
+        if self.method == "robust":
+            # Calculate robust depth by trimming outliers.
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2  # Midpoints of sample intervals.
+            trim_percent = 0.1  # Percentage of outliers to trim from each tail.
+            lower_trim_index = int(weights.shape[-2] * trim_percent)  # Lower trim index.
+            upper_trim_index = int(weights.shape[-2] * (1 - trim_percent))  # Upper trim index.
+            sorted_weights, sorted_indices = torch.sort(weights, dim=-2)  # Sort weights for trimming.
+            sorted_steps = torch.gather(steps, dim=-2, index=sorted_indices)  # Sort steps accordingly.
+            trimmed_weights = sorted_weights[..., lower_trim_index:upper_trim_index, :]  # Trim weights.
+            trimmed_steps = sorted_steps[..., lower_trim_index:upper_trim_index, :]  # Trim steps.
+            trimmed_weight_sum = trimmed_weights.sum(dim=-2, keepdim=True)  # Sum of trimmed weights.
+            depth = (trimmed_weights * trimmed_steps).sum(dim=-2) / trimmed_weight_sum  # Calculate trimmed mean depth.
+            return depth.clamp(min=steps.min(), max=steps.max())  # Clamp to valid range.
+
+        if self.method == "robust_weighted_median":
+            # Calculate depth using a robust weighted median approach.
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2  # Midpoints of sample intervals.
+            flat_weights = weights.view(-1)  # Flatten weights for processing.
+            flat_steps = steps.view(-1)  # Flatten steps for processing.
+            median = torch.median(flat_steps)  # Calculate median of steps.
+            mad = torch.median(torch.abs(flat_steps - median))  # Compute median absolute deviation (MAD).
+            robust_weights = torch.exp(-(torch.abs(flat_steps - median) / (mad + 1e-6))**2)  # Calculate robust weights.
+            flat_weights *= robust_weights  # Apply robust weights to original weights.
+            sorted_steps, sorted_indices = torch.sort(flat_steps)  # Sort steps for median calculation.
+            sorted_weights = flat_weights[sorted_indices]  # Sort weights accordingly.
+            cumulative_weights = torch.cumsum(sorted_weights, dim=0)  # Cumulative sorted weights.
+            total_weight = cumulative_weights[-1]  # Total weight for median calculation.
+            median_idx = torch.searchsorted(cumulative_weights, total_weight / 2)  # Index of weighted median.
+           
+```
 
 We also added gamma correction to our RGB renderer. This adjustment isn't theoretically necessary but does improve details in shadows and display quality.
 
