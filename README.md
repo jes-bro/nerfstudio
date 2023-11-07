@@ -1,15 +1,13 @@
 # Computational Robotics: NeRF or Nothing
 
-![](https://github.com/jes-bro/nerfstudio/blob/main/ezgif.com-video-to-gif.gif)
-![](https://github.com/jes-bro/nerfstudio/blob/main/ezgif.com-gif-maker.gif)
-
-
 ## Goal
 
 The goal of this assignment was to learn about Neural Radiance Fields. The learning process was two-fold:
 
 1. Research NeRFs and understand how they work (understanding them from a theoretical perspective).
-2. Recreate some of the NeRF functionality for ourselves (understanding the implementation). 
+2. Recreate some of the NeRF functionality for ourselves (understanding the implementation).
+
+3. ![](https://github.com/jes-bro/nerfstudio/blob/main/ezgif.com-gif-maker.gif)
 
 ## Approach / Methodology
 For this project, we first had to learn *a lot* about NeRFs and the underlying ML and computer vision theory that allows them to work.
@@ -22,6 +20,8 @@ To learn how NeRFs are implemented at a software-level we decided to do follow a
 2. The Depth Renderer
 3. The RGB Renderer
 4. The Normals Renderer
+
+![](https://github.com/jes-bro/nerfstudio/blob/main/ezgif.com-video-to-gif(1).gif)
 
 ## Conceptual Explanation of Neural Radiance Fields (NeRF)
 
