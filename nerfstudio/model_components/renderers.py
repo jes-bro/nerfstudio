@@ -379,19 +379,11 @@ class AccumulationRenderer(nn.Module):
 
 
 class DepthRenderer(nn.Module):
-    """Calculate depth along ray.
+    """Renderer for calculating depth from ray data using various methods."""
 
-    Depth Method:
-        - median: Depth is set to the distance where the accumulated weight reaches 0.5.
-        - expected: Expected depth along ray. Same procedure as rendering rgb, but with depth.
-
-    Args:
-        method: Depth calculation method.
-    """
-
-    def __init__(self, method: Literal["median", "expected","robust","robust_weighted_median"] = "median") -> None:
+    def __init__(self, method: Literal["median", "expected", "robust", "robust_weighted_median"] = "median") -> None:
         super().__init__()
-        self.method = method
+        self.method = method  # Depth calculation method to be used.
 
     def forward(
         self,
@@ -400,104 +392,55 @@ class DepthRenderer(nn.Module):
         ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
         num_rays: Optional[int] = None,
     ) -> Float[Tensor, "*batch 1"]:
-        """Composite samples along ray and calculate depths.
-
-        Args:
-            weights: Weights for each sample.
-            ray_samples: Set of ray samples.
-            ray_indices: Ray index for each sample, used when samples are packed.
-            num_rays: Number of rays, used when samples are packed.
-
-        Returns:
-            Outputs of depth values.
-        """
+        """Composite weighted samples to calculate depth."""
 
         if self.method == "median":
-            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2
-
-            if ray_indices is not None and num_rays is not None:
-                raise NotImplementedError("Median depth calculation is not implemented for packed samples.")
-            cumulative_weights = torch.cumsum(weights[..., 0], dim=-1)  # [..., num_samples]
-            split = torch.ones((*weights.shape[:-2], 1), device=weights.device) * 0.5  # [..., 1]
-            median_index = torch.searchsorted(cumulative_weights, split, side="left")  # [..., 1]
-            median_index = torch.clamp(median_index, 0, steps.shape[-2] - 1)  # [..., 1]
-            median_depth = torch.gather(steps[..., 0], dim=-1, index=median_index)  # [..., 1]
+            # Calculate median depth values from samples.
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2  # Midpoints of sample intervals.
+            cumulative_weights = torch.cumsum(weights[..., 0], dim=-1)  # Cumulative weights across samples.
+            split = torch.ones((*weights.shape[:-2], 1), device=weights.device) * 0.5  # 50% weight threshold.
+            median_index = torch.searchsorted(cumulative_weights, split, side="left")  # Index where weight is 50%.
+            median_index = torch.clamp(median_index, 0, steps.shape[-2] - 1)  # Clamp index within valid range.
+            median_depth = torch.gather(steps[..., 0], dim=-1, index=median_index)  # Get median depth values.
             return median_depth
+
         if self.method == "expected":
-            eps = 1e-10
-            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2
-
-            if ray_indices is not None and num_rays is not None:
-                # Necessary for packed samples from volumetric ray sampler
-                depth = nerfacc.accumulate_along_rays(
-                    weights[..., 0], values=steps, ray_indices=ray_indices, n_rays=num_rays
-                )
-                accumulation = nerfacc.accumulate_along_rays(
-                    weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
-                )
-                depth = depth / (accumulation + eps)
-            else:
-                depth = torch.sum(weights * steps, dim=-2) / (torch.sum(weights, -2) + eps)
-
-            depth = torch.clip(depth, steps.min(), steps.max())
-
+            # Calculate expected depth values from samples.
+            eps = 1e-10  # Small epsilon to avoid division by zero.
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2  # Midpoints of sample intervals.
+            depth = (torch.sum(weights * steps, dim=-2) / (torch.sum(weights, -2) + eps)).clamp(min=steps.min(), max=steps.max())
+            # Clamped weighted sum of steps to get expected depth.
             return depth
+
         if self.method == "robust":
-            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2
-
-            # Define the percentage to trim from each tail of the distribution
-            trim_percent = 0.1  # for example, 10%
-            lower_trim_index = int(weights.shape[-2] * trim_percent)
-            upper_trim_index = int(weights.shape[-2] * (1 - trim_percent))
-
-            # Sort weights and corresponding steps
-            sorted_weights, sorted_indices = torch.sort(weights, dim=-2)
-            sorted_steps = torch.gather(steps, dim=-2, index=sorted_indices)
-
-            # Trim the sorted weights and steps
-            trimmed_weights = sorted_weights[..., lower_trim_index:upper_trim_index, :]
-            trimmed_steps = sorted_steps[..., lower_trim_index:upper_trim_index, :]
-
-            # Calculate the trimmed mean depth
-            trimmed_weight_sum = trimmed_weights.sum(dim=-2, keepdim=True)
-            depth = (trimmed_weights * trimmed_steps).sum(dim=-2) / trimmed_weight_sum
-
-            return depth.clamp(min=steps.min(), max=steps.max())
+            # Calculate robust depth by trimming outliers.
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2  # Midpoints of sample intervals.
+            trim_percent = 0.1  # Percentage of outliers to trim from each tail.
+            lower_trim_index = int(weights.shape[-2] * trim_percent)  # Lower trim index.
+            upper_trim_index = int(weights.shape[-2] * (1 - trim_percent))  # Upper trim index.
+            sorted_weights, sorted_indices = torch.sort(weights, dim=-2)  # Sort weights for trimming.
+            sorted_steps = torch.gather(steps, dim=-2, index=sorted_indices)  # Sort steps accordingly.
+            trimmed_weights = sorted_weights[..., lower_trim_index:upper_trim_index, :]  # Trim weights.
+            trimmed_steps = sorted_steps[..., lower_trim_index:upper_trim_index, :]  # Trim steps.
+            trimmed_weight_sum = trimmed_weights.sum(dim=-2, keepdim=True)  # Sum of trimmed weights.
+            depth = (trimmed_weights * trimmed_steps).sum(dim=-2) / trimmed_weight_sum  # Calculate trimmed mean depth.
+            return depth.clamp(min=steps.min(), max=steps.max())  # Clamp to valid range.
 
         if self.method == "robust_weighted_median":
-            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2
-            
-            # Flatten the weights and steps for simplicity
-            flat_weights = weights.view(-1)
-            flat_steps = steps.view(-1)
-
-            # Robust Preprocessing: Identify and down-weight outliers
-            # For example, using MAD here for illustrative purposes
-            median = torch.median(flat_steps)
-            mad = torch.median(torch.abs(flat_steps - median))
-            robust_weights = torch.exp(-(torch.abs(flat_steps - median) / (mad + 1e-6))**2)
-
-            # Apply the robust weights to the original weights
-            flat_weights *= robust_weights
-
-            # Now proceed with the weighted median calculation
-            sorted_steps, sorted_indices = torch.sort(flat_steps)
-            sorted_weights = flat_weights[sorted_indices]
-            cumulative_weights = torch.cumsum(sorted_weights, dim=0)
-            total_weight = cumulative_weights[-1]
-            median_idx = torch.searchsorted(cumulative_weights, total_weight / 2)
-
-            # Handle interpolation
-            median_depth = torch.tensor(0.0)  # Placeholder for actual interpolation calculation
-            # ... [Interpolation code as described previously] ...
-
-            # Reshape to the original batch shape with a singleton dimension for depth
-            median_depth = median_depth.view(*weights.shape[:-2], 1)
-
-            return median_depth
-
-
-        raise NotImplementedError(f"Method {self.method} not implemented")
+            # Calculate depth using a robust weighted median approach.
+            steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2  # Midpoints of sample intervals.
+            flat_weights = weights.view(-1)  # Flatten weights for processing.
+            flat_steps = steps.view(-1)  # Flatten steps for processing.
+            median = torch.median(flat_steps)  # Calculate median of steps.
+            mad = torch.median(torch.abs(flat_steps - median))  # Compute median absolute deviation (MAD).
+            robust_weights = torch.exp(-(torch.abs(flat_steps - median) / (mad + 1e-6))**2)  # Calculate robust weights.
+            flat_weights *= robust_weights  # Apply robust weights to original weights.
+            sorted_steps, sorted_indices = torch.sort(flat_steps)  # Sort steps for median calculation.
+            sorted_weights = flat_weights[sorted_indices]  # Sort weights accordingly.
+            cumulative_weights = torch.cumsum(sorted_weights, dim=0)  # Cumulative sorted weights.
+            total_weight = cumulative_weights[-1]  # Total weight for median calculation.
+            median_idx = torch.searchsorted(cumulative_weights, total_weight / 2)  # Index of weighted median.
+           
 
 
 class UncertaintyRenderer(nn.Module):
