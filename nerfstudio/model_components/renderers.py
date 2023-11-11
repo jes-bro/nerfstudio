@@ -316,6 +316,7 @@ class SHRenderer(nn.Module):
         return rgb
 
 
+
 class AccumulationRenderer(nn.Module):
     """Accumulated value along a ray."""
 
@@ -333,43 +334,48 @@ class AccumulationRenderer(nn.Module):
             weights: Weights for each sample
             ray_indices: Ray index for each sample, used when samples are packed.
             num_rays: Number of rays, used when samples are packed.
+            distances: Optional distance weights for attenuation.
 
         Returns:
             Outputs of accumulated values.
         """
 
+        # Check if distances are not provided
         if distances is None:
-
+            # Check if ray_indices and num_rays are provided for packed samples
             if ray_indices is not None and num_rays is not None:
                 # Necessary for packed samples from volumetric ray sampler
                 accumulation = nerfacc.accumulate_along_rays(
                     weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
                 )
             else:
+                # If not packed, sum the weights across the samples dimension
                 accumulation = torch.sum(weights, dim=-2)
         
         else:
-
-            #put distance attenuation here
+            # Distance attenuation should be applied here if distances are provided
 
             # Apply distance attenuation to weights
-            # Assuming that distances are already squared, if not, you would square them here.
-            # We add a small epsilon to prevent division by zero.
+            # Assuming that distances are already squared; square them if they are not.
+            # Adding a small epsilon to prevent division by zero errors.
             epsilon = 1e-7
             epsilon_tensor = torch.tensor(epsilon, device=distances.device, dtype=distances.dtype)
 
+            # Compute attenuated weights by dividing by distances (with epsilon added for numerical stability)
             attenuated_weights = weights / (distances + epsilon_tensor)
 
+            # If samples are packed, accumulate them according to their ray indices
             if ray_indices is not None and num_rays is not None:
-                # If samples are packed, we need to accumulate them according to their ray indices.
                 accumulation = nerfacc.accumulate_along_rays(
                     attenuated_weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
                 )
             else:
-                # If samples are not packed, we can directly sum the attenuated weights.
+                # If samples are not packed, directly sum the attenuated weights
                 accumulation = torch.sum(attenuated_weights, dim=-2)
 
+        # Return the accumulated value along the ray
         return accumulation
+
 
 
 class DepthRenderer(nn.Module):
