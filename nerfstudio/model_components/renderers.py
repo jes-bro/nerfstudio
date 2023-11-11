@@ -486,44 +486,47 @@ class SemanticRenderer(nn.Module):
 
 class NormalsRenderer(nn.Module):
     """Calculate normals along the ray."""
-    def forward(
-        self,
-        normals: torch.Tensor,
-        weights: torch.Tensor,
-        normalize: bool = True,
-    ) -> torch.Tensor:
+    
+    def forward(self, normals: torch.Tensor, weights: torch.Tensor, normalize: bool = True) -> torch.Tensor:
         """Calculate normals along the ray.
-
         Args:
             normals: Normals for each sample [batch_size, num_samples, 3].
             weights: Weights of each sample [batch_size, num_samples, 1].
             normalize: Normalize normals.
         """
+        # Get the batch size and the number of samples from the normals tensor.
         batch_size, num_samples, _ = normals.size()
+        # Initialize a new tensor for the new weights, same shape as original weights.
         new_weights = torch.zeros_like(weights)
 
-        # Compute new weights based on angles
-        for i in range(num_samples):
-            for j in range(i + 1, num_samples):
+        # Compute new weights based on angles between all pairs of normals.
+        for i in range(num_samples):  # Loop over each sample.
+            for j in range(i + 1, num_samples):  # Compare with every other sample.
+                # Calculate the weight based on the angle between pair of normals.
                 angle_weight = angle_based_weighting(normals[:, i, :], normals[:, j, :])
+                # Add this weight to both normals being compared.
                 new_weights[:, i, :] += angle_weight
                 new_weights[:, j, :] += angle_weight
 
-        # Normalize the new weights to keep them in a reasonable range
+        # Normalize the new weights to ensure they remain in a reasonable range.
         new_weights = new_weights / torch.max(new_weights)
 
-        # Use the new weights to blend normals
+        # Calculate the weighted sum of normals using the new weights.
         n = torch.sum(new_weights * normals, dim=1)
 
+        # If normalization is requested, normalize the result.
         if normalize:
             n = safe_normalize(n)
+        # Return the blended normals.
         return n
-    
+
 def angle_based_weighting(normal_a, normal_b):
-    # Calculate the dot product between two normals, which gives the cosine of the angle
+    # Calculate the dot product between two normals, which is the cosine of the angle between them.
     cosine_angle = torch.clamp(torch.dot(normal_a, normal_b), -1.0, 1.0)
-    # Convert cosine to an angle if needed or use the cosine directly for weighting
+    # Use arccos to calculate the actual angle from the cosine value.
     angle = torch.acos(cosine_angle)
-    # Define a new weight based on the angle (smaller angles should have larger weights)
-    weight = torch.exp(-angle)  
+    # Assign a weight based on the angle, giving higher weights to smaller angles (more aligned normals).
+    weight = torch.exp(-angle)
+    # Return the calculated weight.
     return weight
+
