@@ -4,6 +4,7 @@ from os import chdir
 from nerfstudio.utils.eval_utils import eval_setup
 from pathlib import Path
 from nerfstudio.cameras import cameras
+import matplotlib.pyplot as plt
 
 def get_rgb_from_pose_transform(load_config, camera_to_world, fx, fy, cx, cy):
     #batch_camera_to_world = camera_to_world.unsqueeze(0)
@@ -27,9 +28,16 @@ def get_rgb_from_pose_transform(load_config, camera_to_world, fx, fy, cx, cy):
     #breakpoint()
     rgba_image = model.get_rgba_image(outputs)
     print("here")
+    print(rgba_image)
+    print(len(rgba_image))
     return rgba_image
 
 chdir("/home/jess")
 camera_to_world = np.array([[ 1., 0., 0., 3.],[ 0., 0.98078528,-0.19509032,3.],[ 0.,0.19509032,0.98078528,0.]])
 test_path = "/home/jess/outputs/camera_pose/nerfacto/2023-12-04_221013/config.yml"
-get_rgb_from_pose_transform(test_path, torch.Tensor([camera_to_world]), torch.Tensor([1400.]), torch.Tensor([1400.]), torch.Tensor([960.]), torch.Tensor([960.]))
+rgba_image = get_rgb_from_pose_transform(test_path, torch.Tensor([camera_to_world]), torch.Tensor([1400.]), torch.Tensor([1400.]), torch.Tensor([960.]), torch.Tensor([960.]))
+rgba_image_cpu = rgba_image.cpu()
+print(rgba_image_cpu)
+breakpoint()
+plt.imshow(rgba_image_cpu)
+plt.show()
