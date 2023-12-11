@@ -1,12 +1,14 @@
 import numpy as np
+import sys
 import torch
+import json
 from os import chdir
 from nerfstudio.utils.eval_utils import eval_setup
 from pathlib import Path
 from nerfstudio.cameras import cameras
 import matplotlib.pyplot as plt
 
-def get_rgb_from_pose_transform(load_config, camera_to_world, fx, fy, cx, cy):
+def get_rgb_from_pose_transform(load_config, camera_to_world, fx= torch.Tensor([1400.]), fy=torch.Tensor([1400.]), cx=torch.Tensor([960.]), cy=torch.Tensor([960.])):
     #batch_camera_to_world = camera_to_world.unsqueeze(0)
     device = torch.device("cuda")
     camera_to_world = camera_to_world.to(device)
@@ -32,12 +34,24 @@ def get_rgb_from_pose_transform(load_config, camera_to_world, fx, fy, cx, cy):
     print(len(rgba_image))
     return rgba_image
 
-chdir("/home/jess")
-camera_to_world = np.array([[ 1., 0., 0., 3.],[ 0., 0.98078528,-0.19509032,3.],[ 0.,0.19509032,0.98078528,0.]])
-test_path = "/home/jess/outputs/camera_pose/nerfacto/2023-12-04_221013/config.yml"
-rgba_image = get_rgb_from_pose_transform(test_path, torch.Tensor([camera_to_world]), torch.Tensor([1400.]), torch.Tensor([1400.]), torch.Tensor([960.]), torch.Tensor([960.]))
-rgba_image_cpu = rgba_image.cpu()
-print(rgba_image_cpu)
-breakpoint()
-plt.imshow(rgba_image_cpu)
-plt.show()
+if __name__ == '__main__':
+    chdir("/home/jess")
+    test_path = "/home/jess/outputs/camera_pose/nerfacto/2023-12-04_221013/config.yml"
+    string_c2w = sys.argv[1]
+    list_c2w = json.loads(string_c2w)
+    nparray_c2w = np.array([list_c2w])
+    #breakpoint()
+    tensor_c2w = torch.Tensor([nparray_c2w])
+    rgba_image = get_rgb_from_pose_transform(test_path, tensor_c2w, torch.Tensor([1400.]), torch.Tensor([1400.]), torch.Tensor([960.]), torch.Tensor([960.]))
+    rgba_image_cpu = rgba_image.cpu()
+    json_rgba_image = json.dumps(rgba_image)
+    print(json_rgba_image)
+"""    camera_to_world = np.array([[ .5, .5, 0., 0.],[ 0., 0.25,0.,0.],[ 0.,0.,0.25,0.]])
+    test_path = "/home/jess/outputs/camera_pose/nerfacto/2023-12-04_221013/config.yml"
+    rgba_image = get_rgb_from_pose_transform(test_path, torch.Tensor([camera_to_world]), torch.Tensor([1400.]), torch.Tensor([1400.]), torch.Tensor([960.]), torch.Tensor([960.]))
+    rgba_image_cpu = rgba_image.cpu()
+    print(rgba_image_cpu)
+    #breakpoint()
+    plt.imshow(rgba_image_cpu)
+    plt.show()
+    plt.close()"""
